@@ -145,6 +145,11 @@ eraserBtn.addEventListener('click', () => setTool('eraser', eraserBtn));
 rainbowBtn.addEventListener('click', () => setTool('rainbow', rainbowBtn));
 laserBtn.addEventListener('click', () => setTool('laser', laserBtn));
 
+document.getElementById('syncBtn').addEventListener('click', () => {
+    socket.emit('request_canvas_state', socket.id);
+    spawnPing(window.innerWidth/2, window.innerHeight/2, '🔄');
+});
+
 bgBtn.addEventListener('click', () => {
     currentBgIndex = (currentBgIndex + 1) % bgClasses.length;
     const newBg = bgClasses[currentBgIndex];
@@ -301,18 +306,64 @@ closeGalleryBtn.addEventListener('click', () => galleryModal.classList.add('hidd
 toggleSpotifyBtn.addEventListener('click', () => spotifyContainer.classList.toggle('hidden'));
 closeSpotifyBtn.addEventListener('click', () => spotifyContainer.classList.add('hidden'));
 
-let currentYouTubeId = null;
+// --- YOUTUBE PLAYER API ---
+let player;
+window.onYouTubeIframeAPIReady = () => {
+    // Player will be initialized when needed
+};
 
 function updateYouTubeIframe(data) {
     if (!data || !data.id) return;
     currentYouTubeId = data;
-    const baseUrl = data.isPlaylist ? `https://www.youtube.com/embed/videoseries?list=${data.id}` : `https://www.youtube.com/embed/${data.id}`;
-    const embedUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}autoplay=1&mute=0&rel=0`;
-    spotifyEmbedWrapper.innerHTML = `<iframe src="${embedUrl}" width="100%" height="200" frameBorder="0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>`;
+    
+    if (player) {
+        if (data.isPlaylist) player.loadPlaylist({list: data.id});
+        else player.loadVideoById(data.id);
+    } else {
+        spotifyEmbedWrapper.innerHTML = '<div id="yt-player"></div>';
+        player = new YT.Player('yt-player', {
+            height: '200',
+            width: '100%',
+            videoId: data.isPlaylist ? null : data.id,
+            playerVars: { 
+                autoplay: 1, 
+                mute: 0, 
+                rel: 0, 
+                listType: data.isPlaylist ? 'playlist' : null, 
+                list: data.isPlaylist ? data.id : null 
+            },
+            events: {
+                'onStateChange': onPlayerStateChange
+            }
+        });
+    }
     spotifyContainer.classList.add('spotify-vibe-active');
     setTimeout(() => spotifyContainer.classList.remove('spotify-vibe-active'), 5000);
     spawnMusicNotes();
 }
+
+let isExternalUpdate = false;
+function onPlayerStateChange(event) {
+    if (isExternalUpdate) return;
+    const state = event.data;
+    const time = player.getCurrentTime();
+    // 1: playing, 2: paused
+    if (state === 1 || state === 2) {
+        socket.emit('youtube_control', { action: state === 1 ? 'play' : 'pause', time });
+    }
+}
+
+socket.on('youtube_control', (data) => {
+    if (!player) return;
+    isExternalUpdate = true;
+    if (data.action === 'play') {
+        player.seekTo(data.time, true);
+        player.playVideo();
+    } else if (data.action === 'pause') {
+        player.pauseVideo();
+    }
+    setTimeout(() => { isExternalUpdate = false; }, 500);
+});
 
 socket.on('youtube_update', (data) => updateYouTubeIframe(data));
 
@@ -828,15 +879,22 @@ laserCanvas.addEventListener('pointerup', (e) => {
 laserCanvas.addEventListener('pointercancel', stopDrawing);
 laserCanvas.addEventListener('pointerout', stopDrawing);
 
-// Orientation & Resize Handling
+// Orientation & Resize Handling (Optimized for Mobile)
+let lastWidth = window.innerWidth;
 window.addEventListener('resize', () => {
+    if (window.innerWidth === lastWidth) return; // Ignore height-only changes (like address bar)
+    lastWidth = window.innerWidth;
+    
     const temp = canvas.toDataURL();
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     laserCanvas.width = window.innerWidth;
     laserCanvas.height = window.innerHeight;
     const img = new Image();
-    img.onload = () => ctx.drawImage(img, 0, 0);
+    img.onload = () => {
+        ctx.drawImage(img, 0, 0);
+        saveState();
+    };
     img.src = temp;
 });
 
@@ -879,15 +937,24 @@ function emitCursor(x, y) {
     }
 }
 socket.on('cursor', (data) => {
+    if (data.id === socket.id) return;
     let cursorEl = remoteCursors[data.id];
     if (!cursorEl) {
         cursorEl = document.createElement('div'); cursorEl.className = 'remote-cursor';
         const mood = remoteMoods[data.id] ? ` ${remoteMoods[data.id]}` : '';
-        cursorEl.innerHTML = `<svg viewBox="0 0 24 24"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg><div class="cursor-name">Karşı Taraf${mood}</div>`;
+        // High visibility SVG cursor
+        cursorEl.innerHTML = `
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 3L10.07 19.97L12.58 12.58L19.97 10.07L3 3Z" fill="#ff4d4d" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+            </svg>
+            <div class="cursor-name">Karşı Taraf${mood}</div>
+        `;
         cursorsContainerEl.appendChild(cursorEl); remoteCursors[data.id] = cursorEl;
     }
-    cursorEl.style.transform = `translate(${data.x}px, ${data.y}px)`;
-    if (Math.random() > 0.5) createTrailParticle(data.x, data.y, 'rgba(255, 255, 255, 0.8)');
+    cursorEl.style.left = data.x + 'px';
+    cursorEl.style.top = data.y + 'px';
+    cursorEl.style.display = 'block'; // Ensure visible
+    if (Math.random() > 0.6) createTrailParticle(data.x, data.y, '#ff4d4d');
 });
 socket.on('user_disconnected', (id) => { 
     if (remoteCursors[id]) { remoteCursors[id].remove(); delete remoteCursors[id]; } 
