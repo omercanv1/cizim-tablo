@@ -77,6 +77,28 @@
             <i data-lucide="moon"></i>
         </button>
 
+        <button id="chatToggleBtn" class="chat-toggle glass-panel" title="Sohbet">
+            <i data-lucide="message-circle"></i>
+        </button>
+
+        <div id="chatPanel" class="chat-panel glass-panel hidden">
+            <div class="chat-header">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div style="width:8px; height:8px; background:#4dff4d; border-radius:50%; box-shadow: 0 0 5px #4dff4d;"></div>
+                    <span style="font-size:14px; font-weight:600;">Sohbet</span>
+                </div>
+                <button id="closeChatBtn"><i data-lucide="x"></i></button>
+            </div>
+            <div id="chatMessages" class="chat-messages">
+                <div class="msg-bubble msg-theirs">Merhaba! 👋</div>
+            </div>
+            <div id="typingIndicator" class="typing-indicator hidden">Karşı taraf yazıyor...</div>
+            <div class="chat-input-area">
+                <input type="text" id="chatInput" placeholder="Mesaj yaz..." autocomplete="off">
+                <button id="sendChatBtn"><i data-lucide="send"></i></button>
+            </div>
+        </div>
+
         <!-- Toolbar -->
         <div class="toolbar glass-panel">
             <!-- Tools -->

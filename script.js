@@ -256,24 +256,28 @@ socket.on('gallery_update', () => {
 });
 
 async function refreshGallery() {
-    galleryGrid.innerHTML = 'Yükleniyor...';
+    galleryGrid.innerHTML = '<div style="color:#aaa; padding:20px;">Anılar yükleniyor...</div>';
     try {
         const res = await fetch('/api/gallery');
         const images = await res.json();
+        if (images.length === 0) {
+            galleryGrid.innerHTML = '<div style="color:#aaa; padding:20px; grid-column: 1/-1;">Henüz hiç anı biriktirmemişsiniz... 🥺</div>';
+            return;
+        }
         galleryGrid.innerHTML = images.map(img => `
             <div class="gallery-item-container" id="gallery-item-${img.replace(/\W/g, '')}">
-                <img src="/gallery/${img}" class="gallery-item">
+                <img src="/gallery/${img}" class="gallery-item" loading="lazy">
                 <div class="gallery-item-actions">
-                    <a href="/gallery/${img}" download="cizim-${img}" class="album-action-btn download" title="Cihaza İndir">
-                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    <a href="/gallery/${img}" download="cizim-${img}" class="album-action-btn download" title="İndir">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                     </a>
                     <button onclick="deleteImage('${img}')" class="album-action-btn delete" title="Sil">
-                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                     </button>
                 </div>
             </div>
         `).join('');
-    } catch (e) { galleryGrid.innerHTML = 'Hata oluştu.'; }
+    } catch (e) { galleryGrid.innerHTML = '<div style="color:var(--danger); padding:20px;">Hata oluştu.</div>'; }
 }
 
 window.deleteImage = async (filename) => {
@@ -341,7 +345,7 @@ socket.on('youtube_search_results', (results) => {
     searchResults.classList.remove('hidden');
 });
 
-searchResults.addEventListener('click', (e) => {
+searchResults.addEventListener('pointerdown', (e) => {
     const item = e.target.closest('.search-item');
     if (item) {
         socket.emit('youtube_set', item.dataset.id, item.dataset.isplaylist === 'true');
@@ -804,28 +808,37 @@ function continueDrawing(x, y) {
 }
 function stopDrawing() { if (isDrawing && currentTool !== 'laser') saveState(); isDrawing = false; }
 
-laserCanvas.addEventListener('mousedown', (e) => startDrawing(e.clientX, e.clientY));
-laserCanvas.addEventListener('mousemove', (e) => { continueDrawing(e.clientX, e.clientY); emitCursor(e.clientX, e.clientY); });
-laserCanvas.addEventListener('mouseup', stopDrawing);
-laserCanvas.addEventListener('mouseout', stopDrawing);
+// --- DRAWING LISTENERS (UNIFIED POINTER EVENTS) ---
+laserCanvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') e.preventDefault();
+    startDrawing(e.clientX, e.clientY);
+});
 
-laserCanvas.addEventListener('touchstart', (e) => { 
-    if (e.cancelable) e.preventDefault();
-    startDrawing(e.touches[0].clientX, e.touches[0].clientY); 
-}, { passive: false });
+laserCanvas.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch') e.preventDefault();
+    continueDrawing(e.clientX, e.clientY);
+    emitCursor(e.clientX, e.clientY);
+});
 
-laserCanvas.addEventListener('touchmove', (e) => { 
-    if (e.cancelable) e.preventDefault();
-    continueDrawing(e.touches[0].clientX, e.touches[0].clientY); 
-    emitCursor(e.touches[0].clientX, e.touches[0].clientY); 
-}, { passive: false });
-
-laserCanvas.addEventListener('touchend', (e) => {
-    if (e.cancelable) e.preventDefault();
+laserCanvas.addEventListener('pointerup', (e) => {
+    if (e.pointerType === 'touch') e.preventDefault();
     stopDrawing();
-}, { passive: false });
+});
 
-laserCanvas.addEventListener('touchcancel', stopDrawing);
+laserCanvas.addEventListener('pointercancel', stopDrawing);
+laserCanvas.addEventListener('pointerout', stopDrawing);
+
+// Orientation & Resize Handling
+window.addEventListener('resize', () => {
+    const temp = canvas.toDataURL();
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    laserCanvas.width = window.innerWidth;
+    laserCanvas.height = window.innerHeight;
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0);
+    img.src = temp;
+});
 
 socket.on('draw', (data) => draw(data.x0, data.y0, data.x1, data.y1, data.color, data.size, data.toolType, false));
 
@@ -900,14 +913,8 @@ saveBtn.addEventListener('click', async () => {
 });
 
 socket.on('gallery_update', () => {
-    // If gallery is open, refresh it by clicking the toggle twice or just calling refresh logic
     if (!galleryModal.classList.contains('hidden')) {
-        // Simple way: just refresh the grid
-        fetch('/api/gallery')
-            .then(res => res.json())
-            .then(images => {
-                galleryGrid.innerHTML = images.map(img => `<img src="/gallery/${img}" class="gallery-item">`).join('');
-            });
+        refreshGallery();
     }
 });
 
