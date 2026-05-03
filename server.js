@@ -11,10 +11,18 @@ const io = socketIo(server, { maxHttpBufferSize: 1e7 });
 const VALID_USERNAME = 'biz';
 const VALID_PASSWORD = '123';
 
-app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '50mb' })); // For gallery uploads
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.use((req, res, next) => {
+    console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.url}`);
+    next();
+});
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // Gallery API
 const galleryPath = path.join(__dirname, 'public', 'gallery');
@@ -307,7 +315,13 @@ io.on('connection', (socket) => {
     });
 });
 
+// Final 404 Handler
+app.use((req, res) => {
+    console.warn(`[${new Date().toLocaleTimeString()}] 404 NOT FOUND: ${req.url}`);
+    res.status(404).sendFile(path.join(__dirname, 'public', 'index.html')); // Fallback to index if something is weird
+});
+
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on all interfaces at http://0.0.0.0:${PORT}`);
 });
