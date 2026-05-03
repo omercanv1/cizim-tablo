@@ -6,11 +6,18 @@
     <title>Çizim Tahtası</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/themes/nano.min.css"/>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.min.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
 </head>
-<body>
+<body class="bg-dark">
+    <!-- Dynamic Background Elements -->
+    <div id="starfield"></div>
     <!-- Login Screen -->
     <div id="loginScreen" class="login-container">
-        <div class="login-box">
+        <div class="login-box glass-panel">
             <h2>Giriş Yap</h2>
             <p>Sadece özel davetliler girebilir.</p>
             <input type="text" id="usernameInput" placeholder="Kullanıcı Adı" autocomplete="off">
@@ -22,21 +29,177 @@
 
     <!-- Main App (Hidden by default) -->
     <div id="appScreen" style="display: none;">
-        <div class="toolbar">
-            <input type="color" id="colorPicker" value="#ffffff" title="Renk Seç">
-            <input type="range" id="sizePicker" min="1" max="50" value="5" title="Fırça Boyutu">
-            <button id="clearBtn" title="Tahtayı Temizle">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="3 6 5 6 21 6"></polyline>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
-            </button>
+        
+        <button id="toggleSpotifyBtn" class="media-toggle glass-panel spotify-toggle" title="Müzik Çalar">
+            <i data-lucide="play-circle"></i>
+        </button>
+
+        <!-- YouTube Music Widget -->
+        <div id="spotifyContainer" class="media-container glass-panel hidden">
+            <div class="media-header">
+                <h3>Vibe Player 🎵</h3>
+                <div class="header-actions">
+                    <button id="surpriseBtn" class="action-mini-btn" title="Sürpriz Şarkı"><i data-lucide="dice-5"></i></button>
+                    <button id="closeSpotifyBtn" class="close-btn"><i data-lucide="x"></i></button>
+                </div>
+            </div>
+            
+            <div class="search-area">
+                <div class="search-input-wrapper">
+                    <input type="text" id="spotifySearchInput" placeholder="Şarkı veya Mod Ara..." autocomplete="off">
+                    <div id="searchResults" class="search-results hidden"></div>
+                </div>
+            </div>
+
+            <div id="spotifyEmbedWrapper" class="spotify-embed">
+                <!-- YouTube Iframe will be injected here -->
+            </div>
+
+            <div class="spotify-reactions">
+                <button class="react-btn" data-reaction="❤️">❤️</button>
+                <button class="react-btn" data-reaction="🔥">🔥</button>
+                <button class="react-btn" data-reaction="✨">✨</button>
+                <button class="react-btn" data-reaction="🥰">🥰</button>
+            </div>
+        </div>
+
+        <!-- Mood Selector -->
+        <select id="moodSelect" class="mood-select glass-panel" title="Ruh Hali">
+            <option value="none">Ruh Hali...</option>
+            <option value="❤️">❤️ Sevgi Dolu</option>
+            <option value="🎨">🎨 Çiziyor</option>
+            <option value="💤">💤 Uyuyor/AFK</option>
+            <option value="🤔">🤔 Düşünüyor</option>
+            <option value="🤣">🤣 Koptu</option>
+        </select>
+
+        <button id="nightModeBtn" class="night-mode-toggle glass-panel" title="Gece/Gündüz Modu">
+            <i data-lucide="moon"></i>
+        </button>
+
+        <!-- Toolbar -->
+        <div class="toolbar glass-panel">
+            <!-- Tools -->
+            <div class="tool-group">
+                <button id="penBtn" class="tool-btn active" title="Kalem"><i data-lucide="pen-tool"></i></button>
+                <button id="eraserBtn" class="tool-btn" title="Silgi"><i data-lucide="eraser"></i></button>
+                <button id="rainbowBtn" class="tool-btn magic-btn" title="Gökkuşağı"><i data-lucide="palette"></i></button>
+                <button id="laserBtn" class="tool-btn magic-btn" title="Lazer"><i data-lucide="zap"></i></button>
+                <button id="mirrorBtn" class="tool-btn magic-btn" title="Ayna Modu (Simetri)"><i data-lucide="split-square-vertical"></i></button>
+                <button id="noteBtn" class="tool-btn action-btn" title="Yapışkan Not"><i data-lucide="sticky-note"></i></button>
+            </div>
+            <div class="divider"></div>
+            <!-- Settings -->
+            <div class="tool-group">
+                <div class="quick-colors" id="quickColors">
+                    <button class="qc-btn" style="background: #ffffff" data-color="#ffffff"></button>
+                    <button class="qc-btn" style="background: #ff4d4d" data-color="#ff4d4d"></button>
+                    <button class="qc-btn" style="background: #4dabf7" data-color="#4dabf7"></button>
+                    <button class="qc-btn" style="background: #4dff4d" data-color="#4dff4d"></button>
+                    <button class="qc-btn" style="background: #e600e6" data-color="#e600e6"></button>
+                </div>
+                <div id="colorPicker" title="Gelişmiş Renk Seç"></div>
+                <div class="slider-container">
+                    <input type="range" id="sizePicker" min="1" max="50" value="5" title="Fırça Boyutu">
+                </div>
+            </div>
+            <div class="divider"></div>
+            <!-- Actions -->
+            <div class="tool-group">
+                <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+                <button id="imageBtn" class="tool-btn action-btn" title="Fotoğraf Yükle"><i data-lucide="image"></i></button>
+                <button id="gameBtn" class="tool-btn action-btn" title="X-O-X Şablonu"><i data-lucide="grid-3x3"></i></button>
+                <button id="wheelToggleBtn" class="tool-btn action-btn" title="Çarkıfelek"><i data-lucide="dribbble"></i></button>
+                <button id="confettiBtn" class="tool-btn action-btn" title="Konfeti Patlat!"><i data-lucide="party-popper"></i></button>
+                
+                <button id="undoBtn" class="tool-btn action-btn" title="Geri Al"><i data-lucide="undo-2"></i></button>
+                <button id="bgBtn" class="tool-btn action-btn" title="Arka Plan"><i data-lucide="layout-template"></i></button>
+                
+                <button id="saveBtn" class="tool-btn action-btn" title="Galeriye Kaydet"><i data-lucide="save"></i></button>
+                <button id="galleryToggleBtn" class="tool-btn action-btn" title="Anı Galerisi"><i data-lucide="images"></i></button>
+                
+                <button id="clearBtn" class="tool-btn danger-btn" title="Temizle"><i data-lucide="trash-2"></i></button>
+            </div>
         </div>
         
+        <!-- Chat -->
+        <button id="chatToggleBtn" class="chat-toggle glass-panel"><i data-lucide="message-circle"></i><span id="unreadBadge" class="unread-badge" style="display: none;"></span></button>
+        <div id="chatPanel" class="chat-panel glass-panel hidden">
+            <div class="chat-header"><h3>Sohbet</h3><button id="closeChatBtn"><i data-lucide="x"></i></button></div>
+            <div class="chat-messages" id="chatMessages"></div>
+            <div id="typingIndicator" class="typing-indicator hidden">Karşı taraf yazıyor...</div>
+            <div class="chat-input-area"><input type="text" id="chatInput" placeholder="Mesaj yaz..." autocomplete="off"><button id="sendChatBtn"><i data-lucide="send"></i></button></div>
+        </div>
+
+        <!-- Wheel Modal -->
+        <div id="wheelModal" class="modal-container hidden">
+            <div class="modal-box glass-panel wheel-modal-box">
+                <button class="modal-close" id="closeWheelBtn"><i data-lucide="x"></i></button>
+                <h3>Çarkıfelek</h3>
+                <div class="wheel-container">
+                    <div class="wheel-pointer">▼</div>
+                    <div class="wheel" id="wheel"></div>
+                </div>
+                <button id="spinBtn" class="primary-btn">Çevir!</button>
+                <h4 id="wheelResult" class="wheel-result"></h4>
+                
+                <div class="wheel-editor">
+                    <h4>Görevleri Düzenle</h4>
+                    <div id="promptList" class="prompt-list"></div>
+                    <div class="prompt-add">
+                        <input type="text" id="newPromptInput" placeholder="Yeni görev...">
+                        <button id="addPromptBtn"><i data-lucide="plus"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mini Game Modal -->
+        <div id="gameContainer" class="glass-panel hidden" style="display: none;">
+            <div class="media-header">
+                <h3>X-O-X Düellosu</h3>
+                <button id="closeGameBtn" class="close-btn"><i data-lucide="x"></i></button>
+            </div>
+            <div class="game-status" id="gameStatus">Sıra sende değil...</div>
+            <div class="tictactoe-grid" id="tttGrid">
+                <div class="ttt-cell" data-index="0"></div>
+                <div class="ttt-cell" data-index="1"></div>
+                <div class="ttt-cell" data-index="2"></div>
+                <div class="ttt-cell" data-index="3"></div>
+                <div class="ttt-cell" data-index="4"></div>
+                <div class="ttt-cell" data-index="5"></div>
+                <div class="ttt-cell" data-index="6"></div>
+                <div class="ttt-cell" data-index="7"></div>
+                <div class="ttt-cell" data-index="8"></div>
+            </div>
+            <div id="gameWinner" class="game-winner"></div>
+            <button id="resetGameBtn" class="primary-btn">Yeniden Başlat</button>
+        </div>
+
+        <!-- Gallery Modal -->
+        <div id="galleryModal" class="modal-container hidden">
+            <div class="modal-box glass-panel gallery-modal-box">
+                <button class="modal-close" id="closeGalleryBtn"><i data-lucide="x"></i></button>
+                <h3>🖼️ Anı Albümümüz</h3>
+                <p style="font-size: 13px; color: #aaa; margin-bottom: 15px;">Birlikte çizdiğimiz her şey burada ölümsüzleşiyor...</p>
+                <div class="gallery-grid" id="galleryGrid">
+                    <!-- Images will be fetched here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Containers -->
+        <div id="notesContainer"></div>
+        <div id="cursorsContainer"></div>
+        <div id="pingsContainer"></div>
+
+        <!-- Canvases -->
         <canvas id="drawingCanvas"></canvas>
+        <canvas id="laserCanvas"></canvas>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="script.js"></script>
+    <script src="script.js?v=1.1"></script>
+    <script>lucide.createIcons();</script>
 </body>
 </html>
