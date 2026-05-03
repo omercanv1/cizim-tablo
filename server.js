@@ -13,14 +13,14 @@ const VALID_PASSWORD = '123';
 
 app.use(express.json({ limit: '50mb' })); // For gallery uploads
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(__dirname));
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Gallery API
-const galleryPath = path.join(__dirname, 'public', 'gallery');
+const galleryPath = path.join(__dirname, 'gallery');
 if (!fs.existsSync(galleryPath)) {
     fs.mkdirSync(galleryPath, { recursive: true });
 }
