@@ -11,7 +11,7 @@ const io = socketIo(server);
 const VALID_USERNAME = 'biz';
 const VALID_PASSWORD = '123'; // Bunu daha sonra değiştirebilirsiniz
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(__dirname));
 
 io.on('connection', (socket) => {
     let isAuthenticated = false;
