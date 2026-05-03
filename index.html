@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Çizim Tahtası</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-box">
+            <h2>Giriş Yap</h2>
+            <p>Sadece özel davetliler girebilir.</p>
+            <input type="text" id="usernameInput" placeholder="Kullanıcı Adı" autocomplete="off">
+            <input type="password" id="passwordInput" placeholder="Şifre">
+            <button id="loginBtn">Giriş</button>
+            <p id="errorMsg" class="error-text"></p>
+        </div>
+    </div>
+
+    <!-- Main App (Hidden by default) -->
+    <div id="appScreen" style="display: none;">
+        <div class="toolbar">
+            <input type="color" id="colorPicker" value="#ffffff" title="Renk Seç">
+            <input type="range" id="sizePicker" min="1" max="50" value="5" title="Fırça Boyutu">
+            <button id="clearBtn" title="Tahtayı Temizle">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+            </button>
+        </div>
+        
+        <canvas id="drawingCanvas"></canvas>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
