@@ -97,6 +97,17 @@ loginBtn.addEventListener('click', () => {
 });
 passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loginBtn.click(); });
 
+// --- CANVAS RESIZE (defined early so login_success can call it) ---
+function resizeCanvas() {
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
+    tempCanvas.getContext('2d').drawImage(canvas, 0, 0);
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    laserCanvas.width = window.innerWidth; laserCanvas.height = window.innerHeight;
+    ctx.drawImage(tempCanvas, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+}
+
 socket.on('login_success', () => {
     isAuthenticated = true;
     loginScreen.style.display = 'none';
@@ -772,15 +783,7 @@ mirrorBtn.addEventListener('click', () => {
 
 let isDrawing = false; let currentX = 0; let currentY = 0;
 
-function resizeCanvas() {
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
-    tempCanvas.getContext('2d').drawImage(canvas, 0, 0);
-    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-    laserCanvas.width = window.innerWidth; laserCanvas.height = window.innerHeight;
-    ctx.drawImage(tempCanvas, 0, 0);
-    ctx.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
-}
+// Single, authoritative resize handler — no duplicate
 window.addEventListener('resize', resizeCanvas);
 window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 300));
 
@@ -879,24 +882,7 @@ laserCanvas.addEventListener('pointerup', (e) => {
 laserCanvas.addEventListener('pointercancel', stopDrawing);
 laserCanvas.addEventListener('pointerout', stopDrawing);
 
-// Orientation & Resize Handling (Optimized for Mobile)
-let lastWidth = window.innerWidth;
-window.addEventListener('resize', () => {
-    if (window.innerWidth === lastWidth) return; // Ignore height-only changes (like address bar)
-    lastWidth = window.innerWidth;
-    
-    const temp = canvas.toDataURL();
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    laserCanvas.width = window.innerWidth;
-    laserCanvas.height = window.innerHeight;
-    const img = new Image();
-    img.onload = () => {
-        ctx.drawImage(img, 0, 0);
-        saveState();
-    };
-    img.src = temp;
-});
+// (Resize handled by the single authoritative resizeCanvas listener above)
 
 socket.on('draw', (data) => draw(data.x0, data.y0, data.x1, data.y1, data.color, data.size, data.toolType, false));
 
