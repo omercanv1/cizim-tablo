@@ -227,7 +227,8 @@ io.on('connection', (socket) => {
     socket.on('youtube_set', (id, isPlaylist = false) => {
         if (!isAuthenticated) return;
         currentYouTubeId = { id, isPlaylist };
-        io.emit('youtube_update', currentYouTubeId);
+        // Sadece KARSİ tarafa gonder (secen kisi zaten kendi oynatıyor)
+        socket.broadcast.emit('youtube_update', currentYouTubeId);
     });
 
     socket.on('youtube_control', (data) => {
@@ -248,7 +249,8 @@ io.on('connection', (socket) => {
     socket.on('youtube_surprise', () => {
         if (!isAuthenticated) return;
         const randomSong = songLibrary[Math.floor(Math.random() * songLibrary.length)];
-        currentYouTubeId = { id: randomSong.id, isPlaylist: randomSong.isPlaylist };
+        currentYouTubeId = { id: randomSong.id, isPlaylist: randomSong.isPlaylist || false };
+        // Herkese (kendisi dahil) gönder - surprise icin banner gostermek mantıklı
         io.emit('youtube_update', currentYouTubeId);
     });
 

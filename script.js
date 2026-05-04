@@ -313,70 +313,133 @@ galleryToggleBtn.addEventListener('click', () => {
 });
 closeGalleryBtn.addEventListener('click', () => galleryModal.classList.add('hidden'));
 
-// --- YOUTUBE MUSIC (Replaced Spotify) ---
 toggleSpotifyBtn.addEventListener('click', () => spotifyContainer.classList.toggle('hidden'));
 closeSpotifyBtn.addEventListener('click', () => spotifyContainer.classList.add('hidden'));
 
-// --- YOUTUBE PLAYER API ---
-let player;
+// --- YOUTUBE MUSIC ---
+let currentYouTubeId = null;
+let ytReady = false;
+let pendingYTData = null;
+let player = null;
+let isExternalUpdate = false;
+
 window.onYouTubeIframeAPIReady = () => {
-    // Player will be initialized when needed
+    ytReady = true;
+    if (pendingYTData) {
+        createPlayer(pendingYTData);
+        pendingYTData = null;
+    }
 };
 
-function updateYouTubeIframe(data) {
+function createPlayer(data) {
+    spotifyEmbedWrapper.innerHTML = '<div id="yt-player"></div>';
+    player = new YT.Player('yt-player', {
+        height: '200', width: '100%',
+        videoId: data.isPlaylist ? null : data.id,
+        playerVars: {
+            autoplay: 1, rel: 0,
+            listType: data.isPlaylist ? 'playlist' : null,
+            list: data.isPlaylist ? data.id : null
+        },
+        events: { onStateChange: onPlayerStateChange }
+    });
+}
+
+function updateYouTubePlayer(data) {
     if (!data || !data.id) return;
     currentYouTubeId = data;
-    
-    if (player) {
-        if (data.isPlaylist) player.loadPlaylist({list: data.id});
+    if (!ytReady) { pendingYTData = data; return; }
+    if (player && player.loadVideoById) {
+        isExternalUpdate = true;
+        if (data.isPlaylist) player.loadPlaylist({ list: data.id });
         else player.loadVideoById(data.id);
+        setTimeout(() => { isExternalUpdate = false; }, 1000);
     } else {
-        spotifyEmbedWrapper.innerHTML = '<div id="yt-player"></div>';
-        player = new YT.Player('yt-player', {
-            height: '200',
-            width: '100%',
-            videoId: data.isPlaylist ? null : data.id,
-            playerVars: { 
-                autoplay: 1, 
-                mute: 0, 
-                rel: 0, 
-                listType: data.isPlaylist ? 'playlist' : null, 
-                list: data.isPlaylist ? data.id : null 
-            },
-            events: {
-                'onStateChange': onPlayerStateChange
-            }
-        });
+        createPlayer(data);
     }
-    spotifyContainer.classList.add('spotify-vibe-active');
-    setTimeout(() => spotifyContainer.classList.remove('spotify-vibe-active'), 5000);
     spawnMusicNotes();
 }
 
-let isExternalUpdate = false;
+// Kendi sectigimizde -> sunucuya bildir
+function selectSong(data) {
+    currentYouTubeId = data;
+    socket.emit('youtube_set', data.id, data.isPlaylist || false);
+}
+
 function onPlayerStateChange(event) {
     if (isExternalUpdate) return;
-    const state = event.data;
-    const time = player.getCurrentTime();
-    // 1: playing, 2: paused
-    if (state === 1 || state === 2) {
-        socket.emit('youtube_control', { action: state === 1 ? 'play' : 'pause', time });
+    if (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.PAUSED) {
+        const time = player.getCurrentTime();
+        socket.emit('youtube_control', {
+            action: event.data === YT.PlayerState.PLAYING ? 'play' : 'pause',
+            time
+        });
     }
 }
 
+// Karsi taraftan sync geldigi zaman:
+socket.on('youtube_update', (data) => {
+    // Tarayici autoplay politikasi: diger kullanici icin "Dinle" butonu goster
+    showListenBanner(data);
+});
+
 socket.on('youtube_control', (data) => {
-    if (!player) return;
+    if (!player || !player.seekTo) return;
     isExternalUpdate = true;
     if (data.action === 'play') {
         player.seekTo(data.time, true);
         player.playVideo();
-    } else if (data.action === 'pause') {
+    } else {
         player.pauseVideo();
     }
     setTimeout(() => { isExternalUpdate = false; }, 500);
 });
 
-socket.on('youtube_update', (data) => updateYouTubeIframe(data));
+function showListenBanner(data) {
+    // Mevcut banner varsa kaldir
+    const old = document.getElementById('listenBanner');
+    if (old) old.remove();
+
+    const banner = document.createElement('div');
+    banner.id = 'listenBanner';
+    banner.innerHTML = `
+        <span>🎵 Karşı taraf bir şarkı seçti!</span>
+        <button onclick="joinListening()">Birlikte Dinle ▶</button>
+        <button onclick="this.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,0.6);cursor:pointer;font-size:18px;line-height:1;">✕</button>
+    `;
+    banner.style.cssText = `
+        position:fixed; top:15px; left:50%; transform:translateX(-50%);
+        background:linear-gradient(135deg,#1a1a2e,#16213e); color:white;
+        padding:12px 20px; border-radius:50px; z-index:99999;
+        display:flex; align-items:center; gap:12px; font-size:13px; font-weight:500;
+        box-shadow:0 4px 20px rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1);
+        animation: slideDown 0.3s ease-out;
+    `;
+    banner.querySelector('button').style.cssText = `
+        background:linear-gradient(135deg,#4dabf7,#007aff); color:white;
+        border:none; padding:8px 16px; border-radius:20px; cursor:pointer;
+        font-weight:600; font-size:12px;
+    `;
+    document.body.appendChild(banner);
+    window._pendingYTData = data;
+    setTimeout(() => banner.remove(), 15000);
+}
+
+window.joinListening = () => {
+    const data = window._pendingYTData;
+    if (!data) return;
+    // Panel'i ac
+    spotifyContainer.classList.remove('hidden');
+    updateYouTubePlayer(data);
+    const banner = document.getElementById('listenBanner');
+    if (banner) banner.remove();
+};
+
+// Kendi sectigimiz sarkilari gonder
+socket.on('youtube_update_self', (data) => {
+    updateYouTubePlayer(data); // Bize de uygula
+});
+
 
 spotifySearchInput.addEventListener('input', () => {
     const query = spotifySearchInput.value.trim();
@@ -410,13 +473,22 @@ socket.on('youtube_search_results', (results) => {
 searchResults.addEventListener('pointerdown', (e) => {
     const item = e.target.closest('.search-item');
     if (item) {
-        socket.emit('youtube_set', item.dataset.id, item.dataset.isplaylist === 'true');
+        const data = { id: item.dataset.id, isPlaylist: item.dataset.isplaylist === 'true' };
+        // Kendi ekranımızda hemen oynat
+        spotifyContainer.classList.remove('hidden');
+        updateYouTubePlayer(data);
+        // Karsı tarafa bildir
+        socket.emit('youtube_set', data.id, data.isPlaylist);
         searchResults.classList.add('hidden');
         spotifySearchInput.value = '';
     }
 });
 
-surpriseBtn.addEventListener('click', () => socket.emit('youtube_surprise'));
+surpriseBtn.addEventListener('click', () => {
+    socket.emit('youtube_surprise');
+});
+// Surprise: sunucu youtube_update emit eder, banner gosterilir (yukarda handle ediliyor)
+
 
 // Reactions
 reactBtns.forEach(btn => {
@@ -985,43 +1057,79 @@ function spawnPing(x, y) {
     }
 }
 
-// Chat toggle handlers (exists in previous implementation, kept simple here to avoid duplication)
+// ======================
+// SOHBET (CHAT)
+// ======================
 const chatPanelEl = document.getElementById('chatPanel');
-document.getElementById('chatToggleBtn').addEventListener('click', () => chatPanelEl.classList.remove('hidden'));
-document.getElementById('closeChatBtn').addEventListener('click', () => chatPanelEl.classList.add('hidden'));
+const chatToggleBtn = document.getElementById('chatToggleBtn');
+const closeChatBtn = document.getElementById('closeChatBtn');
+const chatMessagesEl = document.getElementById('chatMessages');
+const chatInputEl = document.getElementById('chatInput');
+const sendChatBtnEl = document.getElementById('sendChatBtn');
+const typingIndicatorEl = document.getElementById('typingIndicator');
+
+chatToggleBtn.addEventListener('click', () => {
+    chatPanelEl.classList.toggle('hidden');
+    if (!chatPanelEl.classList.contains('hidden')) {
+        chatInputEl.focus();
+        chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+    }
+});
+closeChatBtn.addEventListener('click', () => chatPanelEl.classList.add('hidden'));
+
+function appendMessage(text, isMine) {
+    const now = new Date();
+    const time = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = `display:flex; flex-direction:column; align-items:${isMine ? 'flex-end' : 'flex-start'}; gap:2px;`;
+    const bubble = document.createElement('div');
+    bubble.className = `msg-bubble ${isMine ? 'msg-mine' : 'msg-theirs'}`;
+    bubble.textContent = text;
+    const ts = document.createElement('div');
+    ts.style.cssText = 'font-size:10px; color:rgba(255,255,255,0.3); padding:0 4px;';
+    ts.textContent = time;
+    wrapper.appendChild(bubble);
+    wrapper.appendChild(ts);
+    chatMessagesEl.appendChild(wrapper);
+    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+}
 
 let typingTimeout;
-const chatInput = document.getElementById('chatInput');
-chatInput.addEventListener('input', () => {
+chatInputEl.addEventListener('input', () => {
     socket.emit('typing', true);
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => socket.emit('typing', false), 2000);
 });
 
-socket.on('typing', (data) => {
-    const ind = document.getElementById('typingIndicator');
-    if (data.isTyping && data.id !== socket.id) {
-        ind.classList.remove('hidden');
-    } else {
-        ind.classList.add('hidden');
+function sendMsg() {
+    const text = chatInputEl.value.trim();
+    if (!text || !isAuthenticated) return;
+    socket.emit('chat_message', text);
+    appendMessage(text, true);
+    chatInputEl.value = '';
+    socket.emit('typing', false);
+    clearTimeout(typingTimeout);
+}
+
+sendChatBtnEl.addEventListener('click', sendMsg);
+chatInputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMsg(); });
+
+socket.on('chat_message', (data) => {
+    if (data.id === socket.id) return; // Kendi mesajimizi zaten appendMessage ile ekledik
+    appendMessage(data.text, false);
+    // Panel kapali ise gorsel bildirim ver
+    if (chatPanelEl.classList.contains('hidden')) {
+        chatToggleBtn.style.animation = 'pulse 0.5s 3';
+        setTimeout(() => chatToggleBtn.style.animation = '', 1500);
     }
 });
 
-// Chat logic from previous version
-document.getElementById('sendChatBtn').addEventListener('click', () => {
-    const text = chatInput.value.trim();
-    if (!text) return; 
-    socket.emit('chat_message', text); 
-    chatInput.value = '';
-    socket.emit('typing', false);
-    clearTimeout(typingTimeout);
+socket.on('typing', (data) => {
+    if (data.id === socket.id) return;
+    if (data.isTyping) {
+        typingIndicatorEl.classList.remove('hidden');
+    } else {
+        typingIndicatorEl.classList.add('hidden');
+    }
 });
-chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') document.getElementById('sendChatBtn').click(); });
-socket.on('chat_message', (data) => {
-    const isMine = data.id === socket.id;
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `msg-bubble ${isMine ? 'msg-mine' : 'msg-theirs'}`;
-    msgDiv.textContent = data.text;
-    document.getElementById('chatMessages').appendChild(msgDiv);
-    document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
-});
+
